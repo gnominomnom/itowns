@@ -88,10 +88,7 @@ export default {
                 node.remove(...node.children.filter(c => c.layer && c.layer.id == layer.id));
                 const group = new THREE.Group();
                 group.layer = layer;
-                group.matrixWorld.copy(node.matrixWorld).invert();
-                group.matrixWorld.decompose(group.position, group.quaternion, group.scale);
-                node.add(group.add(result));
-                group.updateMatrixWorld(true);
+                node.attach(group.add(result));
             } else {
                 node.layerUpdateState[layer.id].failure(1, true);
             }
