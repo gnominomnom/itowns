@@ -157,6 +157,11 @@ export class FeatureGeometry {
      * @param {THREE.Vector3} [normal=THREE.Vector3(0,0,1)] the normal on coordinates.
      */
     pushCoordinatesValues(feature, long, lat, alt = 0, normal = defaultNormal) {
+        if (this.size == 3) {
+            // set altitude from context
+            const base_altitude = feature.style[typeToStyleProperty[feature.type]].base_altitude;
+            alt = isNaN(base_altitude) ? base_altitude(this.properties) : base_altitude;
+        }
         if (feature.normals) {
             normal.toArray(feature.normals, feature._pos);
         }
@@ -518,6 +523,8 @@ export class FeatureCollection extends THREE.Object3D {
         ref.normals = feature.normals;
         ref.size = feature.size;
         ref.vertices = feature.vertices;
+        ref.altitude.min = feature.altitude.min;
+        ref.altitude.max = feature.altitude.max;
         ref._pos = feature._pos;
         this.features.push(ref);
         return ref;
