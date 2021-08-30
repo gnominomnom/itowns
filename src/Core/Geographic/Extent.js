@@ -15,6 +15,11 @@ const dimensionTile = new THREE.Vector2();
 const defaultScheme = new THREE.Vector2(2, 2);
 const r = { row: 0, col: 0, invDiff: 0 };
 
+const cNorthWest =  new Coordinates('EPSG:4326', 0, 0, 0);
+const cSouthWest =  new Coordinates('EPSG:4326', 0, 0, 0);
+const cNorthEast =  new Coordinates('EPSG:4326', 0, 0, 0);
+
+const northWest = new THREE.Vector3();
 const southWest = new THREE.Vector3();
 const northEast = new THREE.Vector3();
 
@@ -243,13 +248,26 @@ class Extent {
     * Returns the dimension of the extent, in a `THREE.Vector2`.
     *
     * @param {THREE.Vector2} [target] - The target to assign the result in.
+    * @param {string} [crs=this.crs] - dimension projection.
     *
     * @return {THREE.Vector2}
     */
-    dimensions(target = new THREE.Vector2()) {
-        target.x = Math.abs(this.east - this.west);
-        target.y = Math.abs(this.north - this.south);
-        return target;
+    dimensions(target = new THREE.Vector2(), crs = this.crs) {
+        if (crs == this.crs) {
+            return target.set(Math.abs(this.east - this.west), Math.abs(this.north - this.south));
+        } else if (crs == 'EPSG:4978') {
+            cNorthWest.crs = this.crs;
+            cSouthWest.crs = this.crs;
+            cNorthEast.crs = this.crs;
+
+            cNorthWest.setFromValues(this.west, this.north, 0).as(crs, cNorthWest).toVector3(northWest);
+            cSouthWest.setFromValues(this.west, this.south, 0).as(crs, cSouthWest).toVector3(southWest);
+            cNorthEast.setFromValues(this.east, this.north, 0).as(crs, cNorthEast).toVector3(northEast);
+
+            return target.set(northWest.distanceTo(northEast), northWest.distanceTo(southWest));
+        } else {
+            return this.as(crs).dimensions(target);
+        }
     }
 
     /**
