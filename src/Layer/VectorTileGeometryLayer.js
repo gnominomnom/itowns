@@ -28,6 +28,7 @@ class VectorTileGeometryLayer extends FeatureGeometryLayer {
      */
     constructor(id, config = {}) {
         super(id, config);
+        this.isVectorTileGeometryLayer = true;
         this.crs = 'EPSG:3857';
     }
 }
