@@ -27,29 +27,38 @@ function assignLayer(object, layer) {
 }
 
 class FeatureNode extends THREE.Group {
-    constructor(mesh, crs) {
+    constructor(mesh) {
         super();
+        this.transformToLocal = new THREE.Group();
+        this.place = new THREE.Group();
+        this.mesh = mesh;
+        // mesh.add(new THREE.AxesHelper(2000));
+    }
+
+    as(crs) {
+        const mesh = this.mesh;
+        // scale original extent to re-projected extent
         const extent =  mesh.feature.extent.as(Crs.formatToEPSG(mesh.feature.extent.crs));
         extent.dimensions(dim_ref, crs);
         extent.dimensions(dim);
         scale.copy(dim_ref).divide(dim);
 
-        const transformToLocal = new THREE.Group();
-        transformToLocal.scale.set(scale.x, scale.y, 1);
+        this.transformToLocal.scale.set(scale.x, scale.y, 1);
 
+        // rotate data if data is inverted
         if (mesh.layer.source.isInverted) {
-            transformToLocal.rotateZ(0.5 * Math.PI);
+            this.transformToLocal.rotateZ(0.5 * Math.PI);
         }
 
-        const place = new THREE.Group();
-        place.position.copy(mesh.position).negate();
-        this.add(transformToLocal.add(place.add(mesh)));
+        // position
+        this.place.position.copy(mesh.position).negate();
+        this.add(this.transformToLocal.add(this.place.add(mesh)));
 
         coord.setFromVector3(mesh.position);
         coord.crs = Crs.formatToEPSG(mesh.feature.extent.crs);
         coord.as(crs, coord).toVector3(this.position);
 
-        // mesh.add(new THREE.AxesHelper(2000));
+        return this;
     }
 }
 
@@ -70,11 +79,23 @@ export default {
             return;
         }
 
-        const features = node.children.filter(n => n.layer == layer);
+        const features = node.children.filter(n => n.layer && (n.layer.id == layer.id));
 
         if (features.length > 0) {
             return features;
         }
+
+        // 'TMS:4326', zoom: 14, row: 3749, col: 16609
+        // 'TMS:4326', zoom: 14, row: 3750, col: 16609
+        //
+
+        const extent = node.getExtentsByProjection('TMS:4326')[0];
+
+        if (!(extent.col == 16609  && (extent.row == 3749 || extent.row == 3750))) {
+            node.layerUpdateState[layer.id].noMoreUpdatePossible();
+            return;
+        }
+        console.log('extent.row', extent.row);
 
         const extentsDestination = node.getExtentsByProjection(layer.source.crs) || [node.extent];
 
@@ -120,7 +141,7 @@ export default {
                     ObjectRemovalHelper.removeChildrenAndCleanupRecursively(layer, mesh);
                     // return;
                 } else if (!mesh.parent || !mesh.parent.visible) {
-                    const featureNode = new FeatureNode(mesh, context.view.referenceCrs);
+                    const featureNode = new FeatureNode(mesh).as(context.view.referenceCrs);
                     node.worldToLocal(featureNode.position);
                     featureNode.layer = layer;
                     node.add(featureNode);
