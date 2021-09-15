@@ -31,20 +31,18 @@ class VectorTileGeometryLayer extends FeatureGeometryLayer {
         this.isVectorTileGeometryLayer = true;
         this.crs = 'EPSG:3857';
     }
-    preUpdate(context, sources) {
-        sources.forEach((node) => {
-            if (node.isTileMesh) {
-                const features = node.children.filter(n => n.layer == this);
-                features.forEach((feature) => {
-                    feature.displayed = true;
-                });
-            }
-        });
-    }
-
-    onMeshCreated(mesh) {
-        console.log('mesh', mesh);
-    }
+    // preUpdate(context, sources) {
+    //     sources.forEach((node) => {
+    //         if (node.isTileMesh) {
+    //             const features = node.children.filter(n => n.layer == this);
+    //             // console.log('node.', node.visible);
+    //             features.forEach((feature) => {
+    //                 // node.remove(feature);
+    //                 // feature.displayed = true;
+    //             });
+    //         }
+    //     });
+    // }
 }
 
 export default VectorTileGeometryLayer;

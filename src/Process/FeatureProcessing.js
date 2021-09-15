@@ -26,40 +26,47 @@ function assignLayer(object, layer) {
     }
 }
 
-class FeatureNode extends THREE.Group {
+export class FeatureNode extends THREE.Group {
     constructor(mesh) {
         super();
+        this.isFeatureNode = true;
         this.transformToLocal = new THREE.Group();
         this.place = new THREE.Group();
         this.mesh = mesh;
+        mesh.featureNode = () => this;
         // mesh.add(new THREE.AxesHelper(2000));
+        this.add(this.transformToLocal.add(this.place.add(mesh)));
+        // rotate data if data is inverted
+        // if (mesh.layer.source.isInverted) {
+        // }
+        this.transformToLocal.rotateZ(0.5 * Math.PI);
     }
 
     as(crs) {
         const mesh = this.mesh;
         // scale original extent to re-projected extent
-        const extent =  mesh.feature.extent.as(Crs.formatToEPSG(mesh.feature.extent.crs));
+
+        coord.crs = Crs.formatToEPSG(mesh.feature.extent.crs);
+        const extent =  mesh.feature.extent.as(coord.crs);
         extent.dimensions(dim_ref, crs);
         extent.dimensions(dim);
         scale.copy(dim_ref).divide(dim);
 
         this.transformToLocal.scale.set(scale.x, scale.y, 1);
 
-        // rotate data if data is inverted
-        if (mesh.layer.source.isInverted) {
-            this.transformToLocal.rotateZ(0.5 * Math.PI);
-        }
-
         // position
         this.place.position.copy(mesh.position).negate();
-        this.add(this.transformToLocal.add(this.place.add(mesh)));
 
         coord.setFromVector3(mesh.position);
-        coord.crs = Crs.formatToEPSG(mesh.feature.extent.crs);
         coord.as(crs, coord).toVector3(this.position);
 
         return this;
     }
+    // remove(a) {
+    //     // eslint-disable-next-line no-debugger
+    //     debugger;
+    //     super.remove(a);
+    // }
 }
 
 export default {
@@ -79,23 +86,22 @@ export default {
             return;
         }
 
-        const features = node.children.filter(n => n.layer && (n.layer.id == layer.id));
+        // const features = node.children.filter(n => n.layer && (n.layer.id == layer.id));
 
-        if (features.length > 0) {
-            return features;
-        }
+        // if (features.length > 0) {
+        //     return features;
+        // }
 
         // 'TMS:4326', zoom: 14, row: 3749, col: 16609
         // 'TMS:4326', zoom: 14, row: 3750, col: 16609
         //
 
-        const extent = node.getExtentsByProjection('TMS:4326')[0];
+        // const extent = node.getExtentsByProjection('TMS:4326')[0];
 
-        if (!(extent.col == 16609  && (extent.row == 3749 || extent.row == 3750))) {
-            node.layerUpdateState[layer.id].noMoreUpdatePossible();
-            return;
-        }
-        console.log('extent.row', extent.row);
+        // if (!(extent.col == 16609  && (extent.row == 3749 || extent.row == 3750))) {
+        //     node.layerUpdateState[layer.id].noMoreUpdatePossible();
+        //     return;
+        // }
 
         const extentsDestination = node.getExtentsByProjection(layer.source.crs) || [node.extent];
 
@@ -126,24 +132,33 @@ export default {
             // if request return empty json, WFSProvider.getFeatures return undefined
 
             // remove old group layer
-            node.remove(...node.children.filter(c => c.layer && c.layer.id == layer.id));
+            // node.remove(...node.children.filter(c => c.layer && c.layer.id == layer.id));
 
             node.layerUpdateState[layer.id].success();
 
-            meshes.forEach((mesh) => {
-                assignLayer(mesh, layer);
+            meshes.forEach((featureNode) => {
+                assignLayer(featureNode, layer);
                 // call onMeshCreated callback if needed
+                // TODO: remove layer.onMeshCreated because there's one more call.
                 if (layer.onMeshCreated) {
-                    layer.onMeshCreated(mesh);
+                    layer.onMeshCreated(featureNode, context);
+                }
+
+                if (featureNode.parent) {
+                    if (featureNode.parent.uuid != node.uuid || !featureNode.parent.parent) {
+                        featureNode.parent.remove(featureNode);
+                    } else {
+                        return;
+                    }
                 }
 
                 if (!node.parent) {
-                    ObjectRemovalHelper.removeChildrenAndCleanupRecursively(layer, mesh);
+                    node.remove(featureNode);
+                    // ObjectRemovalHelper.removeChildrenAndCleanupRecursively(layer, featureNode);
                     // return;
-                } else if (!mesh.parent || !mesh.parent.visible) {
-                    const featureNode = new FeatureNode(mesh).as(context.view.referenceCrs);
+                } else {
+                    featureNode.as(context.view.referenceCrs);
                     node.worldToLocal(featureNode.position);
-                    featureNode.layer = layer;
                     node.add(featureNode);
                 }
             });
